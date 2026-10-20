@@ -1,15 +1,20 @@
 """
-Ziplnk - Production-grade URL shortener
-Flask application for creating and managing shortened URLs.
+Ziplnk - Production-grade URL shortener with Authentication
+Flask application for creating and managing shortened URLs with user authentication.
 """
 
-from flask import Flask, render_template, request, redirect, jsonify, session
+from flask import Flask, render_template, request, redirect, jsonify, session, url_for
 import string
 import random
 import os
 from datetime import datetime
+from functools import wraps
 from database import (
     init_db,
+    create_user,
+    get_user_by_username,
+    get_user_by_id,
+    verify_password,
     create_short_url,
     get_url,
     get_all_urls,
@@ -31,29 +36,148 @@ def generate_short_code(length: int = 6) -> str:
     return "".join(random.choice(characters) for _ in range(length))
 
 
+def login_required(f):
+    """Decorator to require login for a route."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login", next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def admin_required(f):
+    """Decorator to require admin access for a route."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login", next=request.url))
+        
+        user = get_user_by_id(session["user_id"])
+        if not user or not user["is_admin"]:
+            return render_template("403.html"), 403
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+# ============================================================================
+# AUTHENTICATION ROUTES
+# ============================================================================
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    """User registration page."""
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        # Validation
+        if not username or not email or not password:
+            return render_template("register.html", error="All fields are required")
+        
+        if len(username) < 3:
+            return render_template("register.html", error="Username must be at least 3 characters")
+        
+        if len(password) < 6:
+            return render_template("register.html", error="Password must be at least 6 characters")
+        
+        if password != confirm_password:
+            return render_template("register.html", error="Passwords do not match")
+
+        # Create user
+        if create_user(username, email, password):
+            return redirect(url_for("login", success="Account created successfully! Please log in."))
+        else:
+            return render_template("register.html", error="Username or email already exists")
+
+    return render_template("register.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    """User login page."""
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        if not username or not password:
+            return render_template("login.html", error="Username and password are required")
+
+        if verify_password(username, password):
+            user = get_user_by_username(username)
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
+            session["is_admin"] = user["is_admin"]
+            
+            next_page = request.args.get("next")
+            if next_page:
+                return redirect(next_page)
+            return redirect(url_for("dashboard"))
+        else:
+            return render_template("login.html", error="Invalid username or password")
+
+    success = request.args.get("success")
+    return render_template("login.html", success=success)
+
+
+@app.route("/logout")
+def logout():
+    """User logout."""
+    session.clear()
+    return redirect(url_for("index"))
+
+
+# ============================================================================
+# MAIN ROUTES
+# ============================================================================
+
 @app.route("/")
 def index():
     """Home page - URL shortener form."""
-    return render_template("index.html")
+    is_logged_in = "user_id" in session
+    return render_template("index.html", is_logged_in=is_logged_in)
 
 
 @app.route("/dashboard")
+@login_required
 def dashboard():
     """User dashboard - view created links."""
-    user_id = session.get("user_id", "anonymous")
+    user_id = session.get("user_id")
+    user = get_user_by_id(user_id)
     urls = get_user_urls(user_id)
     stats = get_stats()
-    return render_template("dashboard.html", urls=urls, stats=stats, is_admin=False)
+    
+    return render_template(
+        "dashboard.html",
+        urls=urls,
+        stats=stats,
+        is_admin=False,
+        username=user["username"]
+    )
 
 
 @app.route("/admin")
+@admin_required
 def admin():
     """Admin dashboard - view all links and statistics."""
-    # In production, this should require authentication
     urls = get_all_urls()
     stats = get_stats()
-    return render_template("dashboard.html", urls=urls, stats=stats, is_admin=True)
+    
+    return render_template(
+        "dashboard.html",
+        urls=urls,
+        stats=stats,
+        is_admin=True,
+        username=session.get("username")
+    )
 
+
+# ============================================================================
+# API ROUTES
+# ============================================================================
 
 @app.route("/api/shorten", methods=["POST"])
 def shorten_url():
@@ -72,16 +196,14 @@ def shorten_url():
     if len(original_url) < 10:
         return jsonify({"error": "Invalid URL"}), 400
 
+    # Get user_id if logged in
+    user_id = session.get("user_id") if "user_id" in session else None
+
     # Generate unique short code
     max_attempts = 10
     for _ in range(max_attempts):
         short_code = generate_short_code()
-        if create_short_url(short_code, original_url):
-            user_id = session.get("user_id")
-            if not user_id:
-                user_id = f"user_{generate_short_code(8)}"
-                session["user_id"] = user_id
-
+        if create_short_url(short_code, original_url, user_id):
             return jsonify(
                 {
                     "success": True,
@@ -106,14 +228,16 @@ def redirect_to_url(short_code: str):
 
 
 @app.route("/api/urls", methods=["GET"])
+@login_required
 def get_urls_api():
     """API endpoint to get user's URLs."""
-    user_id = session.get("user_id", "anonymous")
+    user_id = session.get("user_id")
     urls = get_user_urls(user_id)
     return jsonify(urls), 200
 
 
 @app.route("/api/admin/urls", methods=["GET"])
+@admin_required
 def get_all_urls_api():
     """API endpoint to get all URLs (admin)."""
     urls = get_all_urls()
@@ -128,6 +252,7 @@ def get_stats_api():
 
 
 @app.route("/api/delete/<short_code>", methods=["DELETE"])
+@login_required
 def delete_url_api(short_code: str):
     """API endpoint to delete a shortened URL."""
     if delete_url(short_code):
@@ -147,10 +272,20 @@ def get_url_info(short_code: str):
         return jsonify({"error": "URL not found"}), 404
 
 
+# ============================================================================
+# ERROR HANDLERS
+# ============================================================================
+
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors."""
     return render_template("404.html"), 404
+
+
+@app.errorhandler(403)
+def forbidden(error):
+    """Handle 403 errors."""
+    return render_template("403.html"), 403
 
 
 @app.errorhandler(500)
@@ -160,4 +295,4 @@ def internal_error(error):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5002)

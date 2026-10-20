@@ -7,14 +7,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="background-gradient"></div>
-    
     <nav class="navbar">
         <div class="nav-container">
-            <div class="logo">
+            <a href="/" class="logo">
                 <span class="logo-icon">⚡</span>
-                <span class="logo-text">Ziplnk</span>
-            </div>
+                <span>Ziplnk</span>
+            </a>
             <ul class="nav-links">
                 <li><a href="/" class="nav-link">Home</a></li>
                 <li><a href="/dashboard" class="nav-link">Dashboard</a></li>
@@ -25,8 +23,8 @@
 
     <main class="container">
         <section class="error-section">
-            <div class="glass-card error-card">
-                <div class="error-icon">🔗❌</div>
+            <div class="card error-card">
+                <div class="error-icon">🔗</div>
                 <h1 class="error-title">Link Not Found</h1>
                 <p class="error-message">
                     The short link "<code>{{ short_code }}</code>" doesn't exist or has been deleted.

@@ -3,18 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if is_admin %}Admin{% else %}User{% endif %} Dashboard - Ziplnk</title>
+    <title>{% if is_admin %}Admin{% else %}Dashboard{% endif %} - Ziplnk</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="background-gradient"></div>
-    
     <nav class="navbar">
         <div class="nav-container">
-            <div class="logo">
+            <a href="/" class="logo">
                 <span class="logo-icon">⚡</span>
-                <span class="logo-text">Ziplnk</span>
-            </div>
+                <span>Ziplnk</span>
+            </a>
             <ul class="nav-links">
                 <li><a href="/" class="nav-link">Home</a></li>
                 <li><a href="/dashboard" class="nav-link {% if not is_admin %}active{% endif %}">Dashboard</a></li>
@@ -56,7 +54,7 @@
             </div>
 
             <!-- URLs Table -->
-            <div class="glass-card">
+            <div class="card">
                 <div class="card-header">
                     <h2>{% if is_admin %}All Links{% else %}Your Links{% endif %}</h2>
                     <p class="card-subtitle">{{ urls|length }} link{{ 's' if urls|length != 1 else '' }} found</p>
@@ -78,32 +76,34 @@
                             <tbody>
                                 {% for url in urls %}
                                     <tr class="table-row">
-                                        <td class="code-cell">
-                                            <code class="short-code">{{ url.short_code }}</code>
+                                        <td>
+                                            <span class="short-code">{{ url.short_code }}</span>
                                         </td>
-                                        <td class="url-cell">
+                                        <td>
                                             <a href="{{ url.original_url }}" target="_blank" class="url-link" title="{{ url.original_url }}">
                                                 {{ url.original_url[:50] }}{% if url.original_url|length > 50 %}...{% endif %}
                                             </a>
                                         </td>
-                                        <td class="clicks-cell">
+                                        <td>
                                             <span class="click-badge">{{ url.click_count }}</span>
                                         </td>
-                                        <td class="date-cell">
+                                        <td>
                                             {{ url.created_at[:10] }}
                                         </td>
                                         {% if is_admin %}
-                                            <td class="user-cell">
+                                            <td>
                                                 {{ url.user_id }}
                                             </td>
                                         {% endif %}
-                                        <td class="actions-cell">
-                                            <button class="btn-action btn-copy-link" onclick="copyLink('{{ url.short_code }}')">
-                                                📋
-                                            </button>
-                                            <button class="btn-action btn-delete" onclick="deleteLink('{{ url.short_code }}')">
-                                                🗑️
-                                            </button>
+                                        <td>
+                                            <div class="actions-cell">
+                                                <button class="btn-action" onclick="copyLink('{{ url.short_code }}')" title="Copy link">
+                                                    📋
+                                                </button>
+                                                <button class="btn-action" onclick="deleteLink('{{ url.short_code }}')" title="Delete link">
+                                                    🗑️
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 {% endfor %}

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ziplnk - URL Shortener</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="background-gradient"></div>
+    
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">Ziplnk</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" class="nav-link active">Home</a></li>
+                <li><a href="/dashboard" class="nav-link">Dashboard</a></li>
+                <li><a href="/admin" class="nav-link">Admin</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="hero">
+            <div class="hero-content">
+                <h1 class="hero-title">Shorten Your URLs</h1>
+                <p class="hero-subtitle">Create short, memorable links in seconds</p>
+            </div>
+
+            <div class="glass-card">
+                <div class="card-header">
+                    <h2>Create Short Link</h2>
+                    <p class="card-subtitle">Paste your long URL below</p>
+                </div>
+
+                <form id="shortenForm" class="form-group">
+                    <div class="input-wrapper">
+                        <input 
+                            type="url" 
+                            id="urlInput" 
+                            placeholder="https://example.com/very/long/url" 
+                            required
+                            class="input-field"
+                        >
+                        <button type="submit" class="btn btn-primary">
+                            <span class="btn-text">Shorten</span>
+                            <span class="btn-icon">→</span>
+                        </button>
+                    </div>
+                    <div id="errorMessage" class="error-message"></div>
+                </form>
+
+                <div id="resultContainer" class="result-container hidden">
+                    <div class="result-card">
+                        <div class="result-header">
+                            <h3>Your Short Link</h3>
+                            <span class="result-badge">✓ Created</span>
+                        </div>
+
+                        <div class="result-item">
+                            <label>Short URL</label>
+                            <div class="result-value-wrapper">
+                                <input 
+                                    type="text" 
+                                    id="shortUrlDisplay" 
+                                    readonly 
+                                    class="result-value"
+                                >
+                                <button type="button" class="btn-copy" onclick="copyToClipboard('shortUrlDisplay')">
+                                    📋 Copy
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="result-item">
+                            <label>Original URL</label>
+                            <div class="result-value-wrapper">
+                                <input 
+                                    type="text" 
+                                    id="originalUrlDisplay" 
+                                    readonly 
+                                    class="result-value"
+                                >
+                                <button type="button" class="btn-copy" onclick="copyToClipboard('originalUrlDisplay')">
+                                    📋 Copy
+                                </button>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-secondary" onclick="resetForm()">
+                            Create Another Link
+                        </button>
+                    </div>
+                </div>
+
+                <div id="loadingSpinner" class="loading-spinner hidden">
+                    <div class="spinner"></div>
+                    <p>Creating your short link...</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <h2>Why Choose Ziplnk?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Lightning Fast</h3>
+                    <p>Create and redirect in milliseconds</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Analytics</h3>
+                    <p>Track clicks and engagement metrics</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Secure</h3>
+                    <p>Your links are safe and encrypted</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📱</div>
+                    <h3>Mobile Ready</h3>
+                    <p>Works perfectly on all devices</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2024 Ziplnk. All rights reserved.</p>
+    </footer>
+
+    <script>
+        const form = document.getElementById('shortenForm');
+        const urlInput = document.getElementById('urlInput');
+        const resultContainer = document.getElementById('resultContainer');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const url = urlInput.value.trim();
+            if (!url) {
+                showError('Please enter a URL');
+                return;
+            }
+
+            showLoading(true);
+            errorMessage.textContent = '';
+
+            try {
+                const response = await fetch('/api/shorten', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showError(data.error || 'Failed to shorten URL');
+                    showLoading(false);
+                    return;
+                }
+
+                displayResult(data);
+                showLoading(false);
+            } catch (error) {
+                showError('An error occurred. Please try again.');
+                showLoading(false);
+            }
+        });
+
+        function displayResult(data) {
+            document.getElementById('shortUrlDisplay').value = data.short_url;
+            document.getElementById('originalUrlDisplay').value = data.original_url;
+            resultContainer.classList.remove('hidden');
+            urlInput.value = '';
+        }
+
+        function resetForm() {
+            resultContainer.classList.add('hidden');
+            urlInput.focus();
+        }
+
+        function showLoading(show) {
+            if (show) {
+                loadingSpinner.classList.remove('hidden');
+                form.style.opacity = '0.5';
+                form.style.pointerEvents = 'none';
+            } else {
+                loadingSpinner.classList.add('hidden');
+                form.style.opacity = '1';
+                form.style.pointerEvents = 'auto';
+            }
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            element.select();
+            document.execCommand('copy');
+            
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '✓ Copied!';
+            setTimeout(() => {
+                button.textContent = originalText;
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

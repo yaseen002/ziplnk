@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if is_admin %}Admin{% else %}User{% endif %} Dashboard - Ziplnk</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="background-gradient"></div>
+    
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">Ziplnk</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" class="nav-link">Home</a></li>
+                <li><a href="/dashboard" class="nav-link {% if not is_admin %}active{% endif %}">Dashboard</a></li>
+                <li><a href="/admin" class="nav-link {% if is_admin %}active{% endif %}">Admin</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="dashboard-section">
+            <div class="dashboard-header">
+                <h1>{% if is_admin %}Admin Dashboard{% else %}Your Dashboard{% endif %}</h1>
+                <p class="dashboard-subtitle">{% if is_admin %}Manage all shortened URLs{% else %}View your shortened URLs{% endif %}</p>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🔗</div>
+                    <div class="stat-content">
+                        <div class="stat-value">{{ stats.total_urls }}</div>
+                        <div class="stat-label">Total URLs</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">👆</div>
+                    <div class="stat-content">
+                        <div class="stat-value">{{ stats.total_clicks }}</div>
+                        <div class="stat-label">Total Clicks</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-content">
+                        <div class="stat-value">{{ stats.total_users }}</div>
+                        <div class="stat-label">Active Users</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- URLs Table -->
+            <div class="glass-card">
+                <div class="card-header">
+                    <h2>{% if is_admin %}All Links{% else %}Your Links{% endif %}</h2>
+                    <p class="card-subtitle">{{ urls|length }} link{{ 's' if urls|length != 1 else '' }} found</p>
+                </div>
+
+                {% if urls %}
+                    <div class="table-wrapper">
+                        <table class="urls-table">
+                            <thead>
+                                <tr>
+                                    <th>Short Code</th>
+                                    <th>Original URL</th>
+                                    <th>Clicks</th>
+                                    <th>Created</th>
+                                    {% if is_admin %}<th>User</th>{% endif %}
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for url in urls %}
+                                    <tr class="table-row">
+                                        <td class="code-cell">
+                                            <code class="short-code">{{ url.short_code }}</code>
+                                        </td>
+                                        <td class="url-cell">
+                                            <a href="{{ url.original_url }}" target="_blank" class="url-link" title="{{ url.original_url }}">
+                                                {{ url.original_url[:50] }}{% if url.original_url|length > 50 %}...{% endif %}
+                                            </a>
+                                        </td>
+                                        <td class="clicks-cell">
+                                            <span class="click-badge">{{ url.click_count }}</span>
+                                        </td>
+                                        <td class="date-cell">
+                                            {{ url.created_at[:10] }}
+                                        </td>
+                                        {% if is_admin %}
+                                            <td class="user-cell">
+                                                {{ url.user_id }}
+                                            </td>
+                                        {% endif %}
+                                        <td class="actions-cell">
+                                            <button class="btn-action btn-copy-link" onclick="copyLink('{{ url.short_code }}')">
+                                                📋
+                                            </button>
+                                            <button class="btn-action btn-delete" onclick="deleteLink('{{ url.short_code }}')">
+                                                🗑️
+                                            </button>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <div class="empty-icon">📭</div>
+                        <h3>No Links Yet</h3>
+                        <p>{% if is_admin %}No shortened URLs have been created yet.{% else %}You haven't created any shortened URLs yet. <a href="/">Create one now!</a>{% endif %}</p>
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2024 Ziplnk. All rights reserved.</p>
+    </footer>
+
+    <script>
+        function copyLink(shortCode) {
+            const shortUrl = `${window.location.origin}/${shortCode}`;
+            const tempInput = document.createElement('input');
+            tempInput.value = shortUrl;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '✓';
+            setTimeout(() => {
+                button.textContent = originalText;
+            }, 2000);
+        }
+
+        function deleteLink(shortCode) {
+            if (confirm(`Are you sure you want to delete the link "${shortCode}"?`)) {
+                fetch(`/api/delete/${shortCode}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Failed to delete link');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred');
+                });
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link Not Found - Ziplnk</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="background-gradient"></div>
+    
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">Ziplnk</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" class="nav-link">Home</a></li>
+                <li><a href="/dashboard" class="nav-link">Dashboard</a></li>
+                <li><a href="/admin" class="nav-link">Admin</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="error-section">
+            <div class="glass-card error-card">
+                <div class="error-icon">🔗❌</div>
+                <h1 class="error-title">Link Not Found</h1>
+                <p class="error-message">
+                    The short link "<code>{{ short_code }}</code>" doesn't exist or has been deleted.
+                </p>
+                <div class="error-actions">
+                    <a href="/" class="btn btn-primary">Create New Link</a>
+                    <a href="/dashboard" class="btn btn-secondary">View Dashboard</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2024 Ziplnk. All rights reserved.</p>
+    </footer>
+</body>
+</html>

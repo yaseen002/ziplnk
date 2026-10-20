@@ -391,3 +391,30 @@ def get_stats() -> Dict[str, Any]:
         "total_clicks": total_clicks,
         "total_users": total_users,
     }
+
+
+def get_user_stats(user_id: int) -> Dict[str, Any]:
+    """
+    Get statistics for a specific user.
+
+    Args:
+        user_id: The user ID to get stats for
+
+    Returns:
+        Dictionary with user-specific statistics
+    """
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM urls WHERE user_id = ?", (user_id,))
+    total_urls = cursor.fetchone()[0]
+
+    cursor.execute("SELECT SUM(click_count) FROM urls WHERE user_id = ?", (user_id,))
+    total_clicks = cursor.fetchone()[0] or 0
+
+    conn.close()
+
+    return {
+        "total_urls": total_urls,
+        "total_clicks": total_clicks,
+    }

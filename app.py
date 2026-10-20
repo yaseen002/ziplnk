@@ -21,6 +21,7 @@ from database import (
     get_user_urls,
     delete_url,
     get_stats,
+    get_user_stats,
 )
 
 app = Flask(__name__)
@@ -148,7 +149,7 @@ def dashboard():
     user_id = session.get("user_id")
     user = get_user_by_id(user_id)
     urls = get_user_urls(user_id)
-    stats = get_stats()
+    stats = get_user_stats(user_id)  # Only user's stats
     
     return render_template(
         "dashboard.html",
@@ -164,7 +165,7 @@ def dashboard():
 def admin():
     """Admin dashboard - view all links and statistics."""
     urls = get_all_urls()
-    stats = get_stats()
+    stats = get_stats()  # Global stats
     
     return render_template(
         "dashboard.html",

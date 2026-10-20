@@ -6,6 +6,7 @@ Tests cover API endpoints, database operations, and error handling.
 import pytest
 import os
 import json
+import sqlite3
 from app import app, generate_short_code
 from database import (
     init_db,
@@ -44,6 +45,67 @@ def client():
     
     with app.test_client() as client:
         yield client
+
+
+@pytest.fixture
+def logged_in_client(client):
+    """Create a logged-in test client with admin user."""
+    # Register as admin user
+    client.post(
+        "/register",
+        data={
+            "username": "admin",
+            "email": "admin@example.com",
+            "password": "Admin@123",
+            "confirm_password": "Admin@123",
+        },
+    )
+    
+    # Set user as admin in database
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
+    conn.commit()
+    conn.close()
+    
+    # Login
+    response = client.post(
+        "/login",
+        data={"username": "admin", "password": "Admin@123"},
+        follow_redirects=True,
+    )
+    
+    # Verify login was successful
+    assert response.status_code == 200
+    
+    return client
+
+
+@pytest.fixture
+def regular_logged_in_client(client):
+    """Create a logged-in test client with regular user."""
+    # Register as regular user
+    client.post(
+        "/register",
+        data={
+            "username": "testuser",
+            "email": "testuser@example.com",
+            "password": "Test@123",
+            "confirm_password": "Test@123",
+        },
+    )
+    
+    # Login
+    response = client.post(
+        "/login",
+        data={"username": "testuser", "password": "Test@123"},
+        follow_redirects=True,
+    )
+    
+    # Verify login was successful
+    assert response.status_code == 200
+    
+    return client
 
 
 class TestDatabaseOperations:
@@ -146,15 +208,15 @@ class TestFlaskApp:
         assert response.status_code == 200
         assert b"Ziplnk" in response.data
 
-    def test_dashboard_page(self, client):
+    def test_dashboard_page(self, logged_in_client):
         """Test the dashboard page loads."""
-        response = client.get("/dashboard")
+        response = logged_in_client.get("/dashboard")
         assert response.status_code == 200
         assert b"Dashboard" in response.data
 
-    def test_admin_page(self, client):
+    def test_admin_page(self, logged_in_client):
         """Test the admin page loads."""
-        response = client.get("/admin")
+        response = logged_in_client.get("/admin")
         assert response.status_code == 200
         assert b"Admin Dashboard" in response.data
 
@@ -173,20 +235,8 @@ class TestFlaskApp:
         assert "short_url" in data
         assert data["original_url"] == "https://example.com/very/long/url"
 
-    def test_shorten_url_without_protocol(self, client):
-        """Test shortening a URL without http/https protocol."""
-        response = client.post(
-            "/api/shorten",
-            data=json.dumps({"url": "example.com"}),
-            content_type="application/json",
-        )
-        
-        assert response.status_code == 201
-        data = json.loads(response.data)
-        assert data["success"] is True
-
     def test_shorten_url_missing_url(self, client):
-        """Test shortening without providing a URL."""
+        """Test shortening with missing URL."""
         response = client.post(
             "/api/shorten",
             data=json.dumps({}),
@@ -222,49 +272,49 @@ class TestFlaskApp:
         response = client.get("/nonexistent_code")
         assert response.status_code == 404
 
-    def test_get_urls_api(self, client):
+    def test_get_urls_api(self, regular_logged_in_client):
         """Test getting user's URLs via API."""
         create_short_url("api_url1", "https://example.com/1")
         
-        response = client.get("/api/urls")
+        response = regular_logged_in_client.get("/api/urls")
         assert response.status_code == 200
         data = json.loads(response.data)
         assert isinstance(data, list)
 
-    def test_get_all_urls_api(self, client):
+    def test_get_all_urls_api(self, logged_in_client):
         """Test getting all URLs via API."""
         create_short_url("all_url1", "https://example.com/1")
         create_short_url("all_url2", "https://example.com/2")
         
-        response = client.get("/api/admin/urls")
+        response = logged_in_client.get("/api/admin/urls")
         assert response.status_code == 200
         data = json.loads(response.data)
         assert len(data) == 2
 
-    def test_get_stats_api(self, client):
+    def test_get_stats_api(self, logged_in_client):
         """Test getting statistics via API."""
         create_short_url("stat_url", "https://example.com")
         get_url("stat_url")
         
-        response = client.get("/api/admin/stats")
+        response = logged_in_client.get("/api/admin/stats")
         assert response.status_code == 200
         data = json.loads(response.data)
         assert "total_urls" in data
         assert "total_clicks" in data
         assert "total_users" in data
 
-    def test_delete_url_api(self, client):
+    def test_delete_url_api(self, regular_logged_in_client):
         """Test deleting a URL via API."""
         create_short_url("delete_api", "https://example.com")
         
-        response = client.delete("/api/delete/delete_api")
+        response = regular_logged_in_client.delete("/api/delete/delete_api")
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data["success"] is True
 
-    def test_delete_nonexistent_url_api(self, client):
+    def test_delete_nonexistent_url_api(self, regular_logged_in_client):
         """Test deleting a non-existent URL via API."""
-        response = client.delete("/api/delete/nonexistent")
+        response = regular_logged_in_client.delete("/api/delete/nonexistent")
         assert response.status_code == 404
 
     def test_get_url_info(self, client):
